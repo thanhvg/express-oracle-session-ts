@@ -1,7 +1,6 @@
 import oracledb from "oracledb";
 // import { Store } from "express-session";
-import { EventEmitter } from "events";
-import { Request } from "express";
+import { Store } from "express-session";
 
 interface StoreOptions extends oracledb.PoolAttributes {
   checkExpirationInterval: number;
@@ -31,31 +30,20 @@ const defaultOptions: StoreOptions = {
   },
 };
 
-declare abstract class Store extends EventEmitter {
-  constructor(config?: any);
-
-  regenerate(req: Request, fn: (err?: any) => any): void;
-  load(sid: string, fn: (err: any, session?: Express.SessionData | null) => any): void;
-  createSession(req: Request, sess: Express.SessionData): void;
-
-  abstract get(sid: string, callback: (err: any, session?: Express.SessionData | null) => void): void;
-  abstract set(sid: string, session: Express.SessionData, callback?: (err?: any) => void): void;
-  abstract destroy(sid: string, callback?: (err?: any) => void): void;
-  // abstract all(callback: (err: any, obj?: { [sid: string]: Express.SessionData } | null) => void): void;
-  abstract length(callback: (err: any, length?: number | null) => void): void;
-  abstract clear(callback?: (err?: any) => void): void;
-  abstract touch(sid: string, session: Express.SessionData, callback?: (err?: any) => void): void;
-}
-
 interface SessionInstance {
-  Store: Store;
+  Store: any;
 }
 
-abstract class StoreClassFactory {}
-
+function isObject(a: any): boolean {
+  const type = typeof a;
+  return type === "function" || type === "object" && !!a;
+} 
 function deepcopy<T>(a: T, b: Partial<T>): T {
+  if (!isObject(a)) {
+    return a;
+  }
   for (const key in a) {
-    if (!b[key]) {
+    if (b[key] === undefined) {
       b[key] = a[key];
     }
     b[key] = deepcopy<T[Extract<keyof T, string>]>(a[key], b[key] as any);
@@ -63,8 +51,8 @@ function deepcopy<T>(a: T, b: Partial<T>): T {
   return b as T;
 }
 
-const store = (session: SessionInstance): typeof Store => {
-  class OracleSessionStore extends Store {
+const store = (session: SessionInstance) => {
+  class OracleSessionStore extends session.Store {
     options: StoreOptions;
     pool: Promise<oracledb.Pool>;
     _expirationInterval = 0;
@@ -99,7 +87,7 @@ const store = (session: SessionInstance): typeof Store => {
 
           // if we have tried enough times
           if (tryCount === 0) {
-            console.log("Give up trying new pool, vpl-router is exiting with code 1");
+            console.log("Give up trying new pool, EOST is exiting with code 1");
             return process.exit(1);
           }
 
@@ -324,8 +312,11 @@ VALUES (:sessionid,:expires,:attributes)`;
 
     setExpirationInterval(interval?: number) {
 		  interval || (interval = this.options.checkExpirationInterval);
-		  this._expirationInterval = setInterval(this.clearExpiredSessions, interval);
+		  setInterval(() => this.clearExpiredSessions, interval);
 	  };
   }
+
   return OracleSessionStore;
 };
+
+export default store;

@@ -131,7 +131,6 @@ PRIMARY KEY (${this.options.schema.columnNames.session_id})
     }
 
     get(sid: string, cb: (err: any, session?: Express.SessionData | null) => void) {
-      console.log("EOTS: get: ", sid);
       const sql = `SELECT ${this.options.schema.columnNames.data} AS data FROM ${this.options.schema.tableName} WHERE ${this.options.schema.columnNames.session_id} = :sessionid AND ROWNUM = 1`;
 
       const params = { sessionid: sid };
@@ -148,7 +147,7 @@ PRIMARY KEY (${this.options.schema.columnNames.session_id})
             try {
               session = result?.rows && result?.rows[0] ? JSON.parse(result?.rows[0][0]) : null;
             } catch (error) {
-              console.log("EOTS: get error", error);
+              console.error("EOTS: get error", error);
               return cb(new Error("Failed to parse data for session: " + sid));
             }
             cb(null, session);

@@ -36,8 +36,8 @@ interface SessionInstance {
 
 function isObject(a: any): boolean {
   const type = typeof a;
-  return type === "function" || type === "object" && !!a;
-} 
+  return type === "function" || (type === "object" && !!a);
+}
 function deepcopy<T>(a: T, b: Partial<T>): T {
   if (!isObject(a)) {
     return a;
@@ -51,7 +51,9 @@ function deepcopy<T>(a: T, b: Partial<T>): T {
   return b as T;
 }
 
-const store = (session: SessionInstance) => {
+// because we export declaration we must explicitly set SessionInstance["Store"]
+// type to avoid private type complain
+const store = (session: SessionInstance): SessionInstance["Store"] => {
   class OracleSessionStore extends session.Store {
     options: StoreOptions;
     pool: Promise<oracledb.Pool>;
@@ -64,7 +66,7 @@ const store = (session: SessionInstance) => {
       this.pool = this.createNewPool();
       if (this.options.createDatabaseTable) {
         this.createDatabaseTable().then(() => {
-			    this.setExpirationInterval();
+          this.setExpirationInterval();
         });
       } else {
         this.setExpirationInterval();
@@ -129,6 +131,7 @@ PRIMARY KEY (${this.options.schema.columnNames.session_id})
     }
 
     get(sid: string, cb: (err: any, session?: Express.SessionData | null) => void) {
+      console.log("EOTS: get: ", sid);
       const sql = `SELECT ${this.options.schema.columnNames.data} AS data FROM ${this.options.schema.tableName} WHERE ${this.options.schema.columnNames.session_id} = :sessionid AND ROWNUM = 1`;
 
       const params = { sessionid: sid };
@@ -145,9 +148,13 @@ PRIMARY KEY (${this.options.schema.columnNames.session_id})
             try {
               session = result?.rows && result?.rows[0] ? JSON.parse(result?.rows[0][0]) : null;
             } catch (error) {
+              console.log("EOTS: get error", error);
               return cb(new Error("Failed to parse data for session: " + sid));
             }
             cb(null, session);
+          })
+          .catch(error => {
+            return cb(new Error(error));
           })
           .finally(() => conn.close());
       });
@@ -311,9 +318,9 @@ VALUES (:sessionid,:expires,:attributes)`;
     }
 
     setExpirationInterval(interval?: number) {
-		  interval || (interval = this.options.checkExpirationInterval);
-		  setInterval(() => this.clearExpiredSessions, interval);
-	  };
+      interval || (interval = this.options.checkExpirationInterval);
+      setInterval(() => this.clearExpiredSessions, interval);
+    }
   }
 
   return OracleSessionStore;

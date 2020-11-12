@@ -1,6 +1,6 @@
 {
   "name": "express-oracle-session-ts",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "An Oracle session store for express.js writen in ts",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
